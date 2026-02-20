@@ -492,7 +492,8 @@ function toggleMobileView() {
 // INIT
 (async function() {
   showLoadingOverlay();
-  // Auth handled by password gate — skip Supabase auth
+  // Auto sign-in to Supabase for read-only data access
+  await _sb.auth.signInWithPassword({ email: 'dandelionwaggaman@gmail.com', password: 'dandelionwaggaman-droid' });
   await hydrateFromSupabase();
   await fetchCachedRentEstimates();
   applyAllStoredCorrections();
