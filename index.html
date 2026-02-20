@@ -493,7 +493,7 @@ function toggleMobileView() {
 (async function() {
   showLoadingOverlay();
   // Auto sign-in to Supabase for read-only data access
-  await _sb.auth.signInWithPassword({ email: 'dandelionwaggaman@gmail.com', password: 'dandelionwaggaman-droid' });
+  await _sb.auth.signInWithPassword({ email: 'realtor@artesia.view', password: 'house123' });
   await hydrateFromSupabase();
   await fetchCachedRentEstimates();
   applyAllStoredCorrections();
