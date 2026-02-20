@@ -338,110 +338,13 @@ function subscribeToChanges(onChangeCallback) {
 }
 
 // ═══════════════════════════════════════════════
-// AUTH — Email + Password (with magic link fallback)
+// AUTH — Disabled for public realtor view (password gate in index.html)
 // ═══════════════════════════════════════════════
-
-async function checkAuth() {
-  var { data: { session } } = await _sb.auth.getSession();
-  if (session) return true;
-
-  // Check for magic link callback (hash fragment from email link)
-  if (window.location.hash && window.location.hash.includes('access_token')) {
-    // Supabase SDK auto-handles this; wait for session
-    await new Promise(function(resolve) { setTimeout(resolve, 1000); });
-    var result = await _sb.auth.getSession();
-    if (result.data.session) {
-      // Clean up URL hash
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-      return true;
-    }
-  }
-
-  showLoginOverlay();
-  return false;
-}
-
-function showLoginOverlay() {
-  var overlay = document.createElement('div');
-  overlay.id = 'auth-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML =
-    '<div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:32px;max-width:380px;width:90%;text-align:center;">' +
-      '<h2 style="color:#f1f5f9;margin-bottom:8px;font-size:20px;">Artesia Dashboard</h2>' +
-      '<p style="color:#94a3b8;font-size:13px;margin-bottom:20px;">Sign in with your email and password.</p>' +
-      '<input id="auth-email" type="email" placeholder="you@example.com" style="width:100%;padding:10px 14px;border:1px solid #475569;border-radius:8px;background:#0f172a;color:#f1f5f9;font-size:14px;margin-bottom:10px;outline:none;" />' +
-      '<input id="auth-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;border:1px solid #475569;border-radius:8px;background:#0f172a;color:#f1f5f9;font-size:14px;margin-bottom:12px;outline:none;" />' +
-      '<button id="auth-submit" onclick="_signInWithPassword()" style="width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Sign In</button>' +
-      '<p id="auth-msg" style="color:#94a3b8;font-size:12px;margin-top:12px;min-height:18px;"></p>' +
-      '<p style="margin-top:16px;"><span onclick="_showMagicLinkMode()" style="color:#60a5fa;font-size:12px;cursor:pointer;text-decoration:underline;">Or sign in with a magic link instead</span></p>' +
-    '</div>';
-  document.body.appendChild(overlay);
-  setTimeout(function() {
-    var el = document.getElementById('auth-email');
-    if (el) el.focus();
-  }, 100);
-  // Allow Enter key to submit
-  document.getElementById('auth-password').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') _signInWithPassword();
-  });
-}
-
-async function _signInWithPassword() {
-  var email = document.getElementById('auth-email').value.trim();
-  var password = document.getElementById('auth-password').value;
-  var msg = document.getElementById('auth-msg');
-  var btn = document.getElementById('auth-submit');
-  if (!email || !password) { msg.style.color = '#f87171'; msg.textContent = 'Please enter email and password.'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Signing in...';
-  var { error } = await _sb.auth.signInWithPassword({ email: email, password: password });
-  if (error) {
-    msg.style.color = '#f87171';
-    msg.textContent = 'Error: ' + error.message;
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
-  } else {
-    var ov = document.getElementById('auth-overlay');
-    if (ov) ov.remove();
-    // Reload to trigger full init
-    window.location.reload();
-  }
-}
-
-function _showMagicLinkMode() {
-  var container = document.querySelector('#auth-overlay > div');
-  if (!container) return;
-  container.innerHTML =
-    '<h2 style="color:#f1f5f9;margin-bottom:8px;font-size:20px;">Artesia Dashboard</h2>' +
-    '<p style="color:#94a3b8;font-size:13px;margin-bottom:20px;">Enter your email to receive a login link.</p>' +
-    '<input id="auth-email" type="email" placeholder="you@example.com" style="width:100%;padding:10px 14px;border:1px solid #475569;border-radius:8px;background:#0f172a;color:#f1f5f9;font-size:14px;margin-bottom:12px;outline:none;" />' +
-    '<button id="auth-submit" onclick="_sendMagicLink()" style="width:100%;padding:10px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Send Login Link</button>' +
-    '<p id="auth-msg" style="color:#94a3b8;font-size:12px;margin-top:12px;min-height:18px;"></p>' +
-    '<p style="margin-top:16px;"><span onclick="showLoginOverlay();document.getElementById(\'auth-overlay\').previousSibling&&document.getElementById(\'auth-overlay\').previousSibling.remove();" style="color:#60a5fa;font-size:12px;cursor:pointer;text-decoration:underline;">Back to password sign in</span></p>';
-  document.getElementById('auth-email').focus();
-}
-
-async function _sendMagicLink() {
-  var email = document.getElementById('auth-email').value.trim();
-  var msg = document.getElementById('auth-msg');
-  var btn = document.getElementById('auth-submit');
-  if (!email) { msg.textContent = 'Please enter your email.'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-  var { error } = await _sb.auth.signInWithOtp({
-    email: email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
-  });
-  if (error) {
-    msg.style.color = '#f87171';
-    msg.textContent = 'Error: ' + error.message;
-    btn.disabled = false;
-    btn.textContent = 'Send Login Link';
-  } else {
-    msg.style.color = '#4ade80';
-    msg.textContent = 'Check your email for a login link!';
-  }
-}
+async function checkAuth() { return true; }
+function showLoginOverlay() {}
+function _signInWithPassword() {}
+function _showMagicLinkMode() {}
+function _sendMagicLink() {}
 
 // ═══════════════════════════════════════════════
 // LAST REFRESH TIMESTAMP
