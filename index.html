@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artesia NM — Property Search · Favi Sotelo Jurney</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="artesia-config.js?v=11"></script>
+<script src="artesia-sync.js?v=5"></script>
+<script src="artesia-data.js?v=11"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f8fafc; color:#1e293b; }
+.app { display:flex; height:100vh; }
+
+/* Sidebar */
+.sb { width:420px; min-width:420px; background:#fff; overflow-y:auto; border-right:1px solid #e2e8f0; display:flex; flex-direction:column; }
+.sb-hdr { padding:20px 24px; background:linear-gradient(135deg,#1e40af,#7e22ce); border-bottom:1px solid #e2e8f0; }
+.sb-hdr h1 { font-size:18px; font-weight:800; color:#fff; margin-bottom:2px; }
+.sb-hdr p { font-size:11px; color:rgba(255,255,255,0.7); }
+
+/* Tabs */
+.tabs { display:flex; border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+.tab { flex:1; padding:12px 8px; text-align:center; font-size:11px; font-weight:700; color:#94a3b8; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; }
+.tab.active { color:#1e40af; border-bottom-color:#1e40af; background:#fff; }
+.tab:hover { color:#475569; }
+
+/* Panel */
+.panel { display:none; flex:1; }
+.panel.active { display:block; }
+
+/* Property list */
+.prop { padding:14px 20px; border-bottom:1px solid #f1f5f9; cursor:pointer; transition:background 0.15s; display:flex; align-items:center; gap:14px; }
+.prop:hover { background:#f0f9ff; }
+.prop-rank { width:28px; height:28px; border-radius:50%; background:#1e40af; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex-shrink:0; }
+.prop-rank.green { background:#059669; }
+.prop-rank.yellow { background:#d97706; }
+.prop-rank.red { background:#dc2626; }
+.prop-info { flex:1; min-width:0; }
+.prop-addr { font-size:13px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.prop-meta { font-size:11px; color:#64748b; margin-top:2px; }
+.prop-score { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; flex-shrink:0; }
+.prop-link { font-size:10px; color:#2563eb; text-decoration:none; font-weight:600; flex-shrink:0; }
+.prop-link:hover { text-decoration:underline; }
+
+/* Section headers */
+.sec-hdr { padding:12px 20px; font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:#94a3b8; font-weight:700; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
+
+/* Pref cards */
+.pref-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 20px; }
+.pref-card { padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; }
+.pref-icon { font-size:20px; margin-bottom:4px; }
+.pref-title { font-size:12px; font-weight:800; color:#1e293b; margin-bottom:4px; }
+.pref-desc { font-size:10px; color:#64748b; line-height:1.5; }
+
+/* Home history */
+.hh-card { padding:14px; margin:0 20px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; }
+.hh-num { width:22px; height:22px; border-radius:50%; background:#1e40af; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; margin-right:8px; flex-shrink:0; }
+.hh-addr { font-size:13px; font-weight:800; color:#1e293b; }
+.hh-loc { font-size:10px; color:#64748b; margin:2px 0 6px; padding-left:30px; }
+.hh-specs { display:flex; flex-wrap:wrap; gap:4px; padding-left:30px; margin-bottom:8px; }
+.hh-spec { font-size:9px; padding:2px 6px; background:#f1f5f9; border-radius:3px; color:#475569; }
+.hh-lesson { font-size:10px; color:#475569; padding:3px 0; line-height:1.5; }
+.hh-lesson.good::before { content:'✓ '; color:#16a34a; font-weight:700; }
+.hh-lesson.bad::before { content:'✗ '; color:#dc2626; font-weight:700; }
+
+/* Contact */
+.contact-card { margin:12px 20px; padding:16px; background:linear-gradient(135deg,#eff6ff,#faf5ff); border:1px solid #c7d2fe; border-radius:10px; }
+.contact-name { font-size:16px; font-weight:800; color:#1e293b; margin-bottom:8px; }
+.contact-line { font-size:12px; color:#475569; line-height:2; }
+.contact-phone { font-size:18px; font-weight:800; color:#1e40af; text-decoration:none; display:inline-block; margin-top:8px; padding:8px 16px; background:#1e40af12; border:1px solid #1e40af33; border-radius:8px; }
+.contact-phone:hover { background:#1e40af22; }
+
+/* Map */
+.map-wrap { flex:1; position:relative; }
+#map { width:100%; height:100%; }
+.m-ov { position:absolute; z-index:1000; background:rgba(255,255,255,0.95); border-radius:8px; padding:10px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
+.m-top { top:12px; left:12px; }
+.m-bot { bottom:12px; left:12px; max-height:40%; overflow-y:auto; font-size:10px; }
+.m-bot h3 { font-size:11px; margin-bottom:6px; color:#475569; }
+.li { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.lbox { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+.ltxt { font-size:10px; color:#64748b; }
+
+/* Mobile */
+@media (max-width:768px) {
+  .app { flex-direction:column; }
+  .sb { width:100%; min-width:100%; height:50vh; }
+  .map-wrap { height:50vh; }
+  .mobile-toggle { display:block; position:fixed; bottom:12px; left:50%; transform:translateX(-50%); z-index:2000; padding:8px 20px; background:#1e40af; color:#fff; border:none; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; }
+  .mob-hidden { display:none !important; }
+}
+@media (min-width:769px) { .mobile-toggle { display:none; } }
+
+/* Loading overlay */
+.loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.9); z-index:99999; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.loading-overlay .spinner { width:36px; height:36px; border:3px solid #334155; border-top-color:#60a5fa; border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="pw-gate" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#1e40af,#7e22ce);display:flex;align-items:center;justify-content:center;">
+  <div style="text-align:center;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <p style="font-size:13px;font-style:italic;opacity:0.8;margin-bottom:20px;line-height:1.5;max-width:360px;">"My people will live in peaceful places,<br>in safe homes, and in calm places of rest."<br>— Isaiah 32:18</p>
+    <h1 style="font-size:22px;font-weight:800;margin-bottom:6px;">Artesia Property Search</h1>
+    <p style="font-size:12px;opacity:0.7;margin-bottom:24px;">Enter the access word to continue</p>
+    <input id="pw-input" type="password" placeholder="Access word" autofocus
+      style="padding:10px 16px;border:none;border-radius:8px;font-size:15px;width:220px;text-align:center;outline:none;"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <br>
+    <button onclick="checkPw()" style="margin-top:12px;padding:8px 28px;border:none;border-radius:6px;background:rgba(255,255,255,0.2);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Enter</button>
+    <p id="pw-err" style="margin-top:12px;font-size:12px;color:#fca5a5;display:none;">Incorrect — try again</p>
+  </div>
+</div>
+<script>
+function checkPw(){var v=document.getElementById('pw-input').value.toLowerCase().trim();if(v==='favi'){document.getElementById('pw-gate').style.display='none';}else{document.getElementById('pw-err').style.display='block';document.getElementById('pw-input').value='';document.getElementById('pw-input').focus();}}
+</script>
+
+<div class="app">
+  <button class="mobile-toggle" id="mob-toggle" onclick="toggleMobileView()">Show Map</button>
+  <div class="sb" id="mob-sb">
+    <div class="sb-hdr">
+      <p style="font-size:10px;font-style:italic;color:rgba(255,255,255,0.85);margin-bottom:8px;line-height:1.4;">"My people will live in peaceful places, in safe homes, and in calm places of rest." — Isaiah 32:18</p>
+      <h1>Artesia Property Search</h1>
+      <p style="font-size:12px;color:rgba(255,255,255,0.9);margin-top:4px;">Prepared for Fabiola "Favi" Sotelo Jurney · Licensed NM Real Estate Qualifying Broker</p>
+      <p style="font-size:10px;color:rgba(255,255,255,0.6);">Lois Oliver Real Estate Inc</p>
+      <p style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:6px;">Last refresh: <span id="update-time"></span></p>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('properties')">Properties <span id="cnt-props"></span></div>
+      <div class="tab" onclick="switchTab('prefs')">Client Prefs</div>
+      <div class="tab" onclick="switchTab('history')">Home History</div>
+      <div class="tab" onclick="switchTab('contact')">Contact</div>
+    </div>
+
+    <!-- Properties panel -->
+    <div class="panel active" id="panel-properties"></div>
+
+    <!-- Client Prefs panel -->
+    <div class="panel" id="panel-prefs">
+      <div class="sec-hdr">What the Client Wants</div>
+      <div style="padding:12px 0;">
+        <div class="pref-grid">
+          <div class="pref-card">
+            <div class="pref-icon">🤫</div>
+            <div class="pref-title">Quiet & Peaceful</div>
+            <div class="pref-desc">Absolute top priority. No industrial noise, no truck routes, no school zones. Works 5 days/week and needs rest at home.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">🚶</div>
+            <div class="pref-title">Walkable Access</div>
+            <div class="pref-desc">#1 scoring priority. Wants walkable paths, sidewalks, or trails nearby. Daily walks with dog are essential.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">📐</div>
+            <div class="pref-title">Small Footprint</div>
+            <div class="pref-desc">Under 1,500 sqft ideal. Doesn't want to maintain, heat, cool, or clean a big house while working full-time.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">🏡</div>
+            <div class="pref-title">Space from Neighbors</div>
+            <div class="pref-desc">Wants as much distance from neighbors as possible. Larger lot with house set back from lot lines.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">🚗</div>
+            <div class="pref-title">Garage Neighborhood</div>
+            <div class="pref-desc">Prefers neighborhoods where residents use their garages for vehicles. Engine noise is dampened inside a garage vs. on the street.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">🐕</div>
+            <div class="pref-title">Fenced Yard for Dog</div>
+            <div class="pref-desc">Needs a fenced yard for her dog. Existing fence strongly preferred — privacy fence or block wall ideal.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">📍</div>
+            <div class="pref-title">Target Areas</div>
+            <div class="pref-desc">South and southwest Artesia preferred. SA2 (Suburban Acreage) and R1A (Single Family South) zones are ideal.</div>
+          </div>
+          <div class="pref-card">
+            <div class="pref-icon">🏘️</div>
+            <div class="pref-title">Rental Marketable</div>
+            <div class="pref-desc">Home should be easily marketable as a rental if needed in the future. Good location, layout, and condition.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home History panel -->
+    <div class="panel" id="panel-history">
+      <div class="sec-hdr">Previous Homes — Pattern & Preferences</div>
+      <div style="padding:12px 0;">
+        <div class="hh-card">
+          <div style="display:flex;align-items:center;"><span class="hh-num">1</span><span class="hh-addr">2042 SE Ankeny St</span></div>
+          <div class="hh-loc">Portland, OR 97214 — Kerns Neighborhood</div>
+          <div class="hh-specs">
+            <span class="hh-spec">2024 – 2026</span>
+            <span class="hh-spec">$530K</span>
+            <span class="hh-spec">2bd/1.5ba</span>
+            <span class="hh-spec">1,610 sqft</span>
+            <span class="hh-spec">0.05 ac</span>
+          </div>
+          <div class="hh-lesson good">Compact spaces work — 1,610 sqft was plenty</div>
+          <div class="hh-lesson bad">Urban density and noise — now prioritizes quiet</div>
+          <div class="hh-lesson">Currently selling to relocate for Artesia move</div>
+        </div>
+
+        <div class="hh-card">
+          <div style="display:flex;align-items:center;"><span class="hh-num">2</span><span class="hh-addr">1417 Sparks St</span></div>
+          <div class="hh-loc">Midland, TX 79701</div>
+          <div class="hh-specs">
+            <span class="hh-spec">2021 – 2024</span>
+            <span class="hh-spec">$290K</span>
+            <span class="hh-spec">3bd/2ba</span>
+            <span class="hh-spec">2,231 sqft</span>
+            <span class="hh-spec">2-car garage</span>
+          </div>
+          <div class="hh-lesson good">Appreciates character homes with unique features</div>
+          <div class="hh-lesson bad">2,231 sqft — larger than client now wants</div>
+        </div>
+
+        <div class="hh-card">
+          <div style="display:flex;align-items:center;"><span class="hh-num">3</span><span class="hh-addr">424 E Alto Drive</span></div>
+          <div class="hh-loc">Hobbs, NM 88240</div>
+          <div class="hh-specs">
+            <span class="hh-spec">2019 – 2021</span>
+            <span class="hh-spec">3bd/2ba</span>
+            <span class="hh-spec">~2,100 sqft</span>
+            <span class="hh-spec">$240k</span>
+          </div>
+          <div class="hh-lesson good">Familiar with SE New Mexico — knows culture, climate</div>
+          <div class="hh-lesson bad">At ~2,100 sqft, larger than now preferred</div>
+        </div>
+
+        <div class="hh-card">
+          <div style="display:flex;align-items:center;"><span class="hh-num">4</span><span class="hh-addr">1799 1st Avenue East</span></div>
+          <div class="hh-loc">Dickinson, ND 58601 — Bakken Oil Region</div>
+          <div class="hh-specs">
+            <span class="hh-spec">2019 – 2021</span>
+            <span class="hh-spec">2bd/2ba</span>
+            <span class="hh-spec">Attached w/ 2-car garage</span>
+            <span class="hh-spec">Oil & gas town</span>
+            <span class="hh-spec">$215k</span>
+          </div>
+          <div class="hh-lesson">First oil town — follows refinery/energy sector work</div>
+        </div>
+
+        <div style="margin:4px 20px 12px;padding:14px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+          <div style="font-size:11px;font-weight:700;color:#1e40af;margin-bottom:6px;">Pattern Summary</div>
+          <div style="font-size:11px;color:#3b82f6;line-height:1.7;">
+            <strong>1.</strong> Follows oil & gas work: Dickinson ND → Hobbs NM → Midland TX → Portland OR → Artesia NM.<br>
+            <strong>2.</strong> Consistent 2–3 year hold pattern — every home sold within 2–3 years for relocation.<br>
+            <strong>3.</strong> Previous homes 1,600–2,400 sqft — now explicitly wants SMALLER (under 1,500 sqft).<br>
+            <strong>4.</strong> Knows the Permian Basin well — Hobbs is similar to Artesia.<br>
+            <strong>5.</strong> Works full-time 5 days/week — house must be low-maintenance.<br>
+            <strong>6.</strong> Relocation purchase (Sterling Lexicon) — strict eligibility criteria apply.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact panel -->
+    <div class="panel" id="panel-contact">
+      <div class="sec-hdr">Client Contact Information</div>
+      <div class="contact-card">
+        <div class="contact-name">Dandelion Waggaman</div>
+        <div class="contact-line">
+          Relocating for work (refinery)<br>
+          Sterling Lexicon — Buyer Value Option<br>
+          Timeline: Close by May 1, 2026
+        </div>
+        <a class="contact-phone" href="tel:505-577-9071">📞 505-577-9071</a>
+      </div>
+      <div style="margin-top:12px;padding:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
+        <div style="font-size:11px;font-weight:700;color:#1e40af;margin-bottom:6px;">Relo Counselor</div>
+        <div style="font-size:12px;font-weight:700;color:#1e293b;">Nancy Tuz</div>
+        <div style="font-size:11px;color:#475569;line-height:1.6;">
+          Sterling Lexicon<br>
+          <a href="mailto:Nancy.Tuz@sterlinglexicon.com" style="color:#2563eb;">Nancy.Tuz@sterlinglexicon.com</a><br>
+          <a href="tel:770-817-2149" style="color:#2563eb;">📞 770-817-2149</a> (Office)<br>
+          <a href="tel:404-202-9027" style="color:#2563eb;">📱 404-202-9027</a> (Mobile)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-wrap mob-hidden" id="mob-map">
+    <div id="map"></div>
+    <div class="m-ov m-top">
+      <div style="font-size:13px;font-weight:800;color:#1e293b;">Requested Showings</div>
+      <div style="font-size:10px;color:#64748b;margin-top:2px;">Client-requested properties only</div>
+      <div style="margin-top:6px;">
+        <div id="sat-toggle" onclick="toggleSatellite()" style="font-size:9px;padding:4px 10px;border-radius:6px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;cursor:pointer;display:inline-block;">🛰️ Satellite</div>
+      </div>
+    </div>
+    <div class="m-ov m-bot" id="legend">
+      <h3>Map Key</h3>
+      <div class="li"><div class="lbox" style="background:#059669;border-radius:50%;width:10px;height:10px;"></div><span class="ltxt">Showing requested</span></div>
+      <div class="li"><div class="lbox" style="background:#22c55e33;"></div><span class="ltxt">SA2 Suburban Acreage (best)</span></div>
+      <div class="li"><div class="lbox" style="background:#4ade8033;"></div><span class="ltxt">R1A Single Family South</span></div>
+      <div class="li"><div class="lbox" style="background:#ef444433;"></div><span class="ltxt">Avoid zones (industrial/commercial)</span></div>
+      <div class="li"><div class="lbox" style="background:#f59e0b;height:3px;border-radius:1px;"></div><span class="ltxt">Runway / flight path</span></div>
+      <div class="li"><div class="lbox" style="background:#ef4444;height:3px;border-radius:1px;"></div><span class="ltxt">Helicopter route</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// MAP SETUP
+var map = L.map('map', { zoomControl: false }).setView([32.832, -104.415], 14);
+L.control.zoom({ position: 'topright' }).addTo(map);
+var lightTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OSM &copy; CARTO', maxZoom: 19
+}).addTo(map);
+var satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '&copy; Esri &copy; Maxar', maxZoom: 19
+});
+var satLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19, pane: 'overlayPane'
+});
+var satelliteOn = false;
+function toggleSatellite() {
+  satelliteOn = !satelliteOn;
+  var btn = document.getElementById('sat-toggle');
+  if (satelliteOn) {
+    map.removeLayer(lightTile); satTile.addTo(map); satLabels.addTo(map);
+    if (btn) { btn.style.background = '#1e40af'; btn.style.color = '#fff'; btn.textContent = '🛰️ Satellite: ON'; }
+  } else {
+    map.removeLayer(satTile); map.removeLayer(satLabels); lightTile.addTo(map);
+    if (btn) { btn.style.background = '#f1f5f9'; btn.style.color = '#64748b'; btn.textContent = '🛰️ Satellite'; }
+  }
+}
+
+// Zone overlays
+var displayZones = [
+  { name:'SA2 South', score:95, clr:'#22c55e', coords:[[32.822,-104.425],[32.822,-104.395],[32.830,-104.395],[32.832,-104.410],[32.830,-104.425]]},
+  { name:'SA2 Southwest', score:92, clr:'#22c55e', coords:[[32.825,-104.440],[32.825,-104.425],[32.835,-104.425],[32.838,-104.430],[32.835,-104.440],[32.828,-104.440]]},
+  { name:'R1A South', score:82, clr:'#4ade80', coords:[[32.832,-104.415],[32.832,-104.400],[32.838,-104.398],[32.840,-104.400],[32.840,-104.415],[32.836,-104.418]]},
+  { name:'Commercial (Avoid)', score:15, clr:'#ef4444', coords:[[32.841,-104.418],[32.841,-104.385],[32.844,-104.384],[32.844,-104.418]]},
+  { name:'Industrial (Avoid)', score:8, clr:'#ef4444', coords:[[32.855,-104.412],[32.855,-104.390],[32.868,-104.388],[32.870,-104.395],[32.868,-104.414]]},
+  { name:'Airport (Avoid)', score:10, clr:'#ef4444', coords:[[32.835,-104.460],[32.835,-104.430],[32.855,-104.428],[32.858,-104.440],[32.855,-104.462]]},
+];
+displayZones.forEach(function(z) {
+  var op = z.score >= 75 ? 0.15 : 0.12;
+  L.polygon(z.coords, { color: z.clr, fillColor: z.clr, fillOpacity: op, weight: 2, opacity: 0.5, dashArray: z.score < 30 ? '5,5' : '' }).addTo(map)
+    .bindPopup('<strong>' + z.name + '</strong>');
+});
+
+// Flight path overlays
+(function() {
+  var ATS = { lat: 32.8519, lng: -104.4676 };
+  var HOSP = { lat: 32.8490, lng: -104.4112 };
+  function proj(lat, lng, hdg, dist) {
+    var rad = hdg * Math.PI / 180;
+    return [lat + dist * Math.cos(rad), lng + dist * Math.sin(rad) / Math.cos(lat * Math.PI / 180)];
+  }
+  var rwy04 = proj(ATS.lat, ATS.lng, 45, 0.009);
+  var rwy22 = proj(ATS.lat, ATS.lng, 225, 0.009);
+  L.polyline([rwy04, rwy22], { color: '#f59e0b', weight: 4, opacity: 0.9 }).addTo(map);
+  var app04 = proj(ATS.lat, ATS.lng, 45, 0.04);
+  var app22 = proj(ATS.lat, ATS.lng, 225, 0.04);
+  L.polyline([app04, rwy04], { color: '#f59e0b', weight: 2, opacity: 0.4, dashArray: '8,6' }).addTo(map);
+  L.polyline([app22, rwy22], { color: '#f59e0b', weight: 2, opacity: 0.4, dashArray: '8,6' }).addTo(map);
+  var rwy13 = proj(ATS.lat, ATS.lng, 135, 0.008);
+  var rwy31 = proj(ATS.lat, ATS.lng, 315, 0.008);
+  L.polyline([rwy13, rwy31], { color: '#fb923c', weight: 4, opacity: 0.9 }).addTo(map);
+  L.polyline([[HOSP.lat, HOSP.lng], [ATS.lat, ATS.lng]], { color: '#ef4444', weight: 2.5, opacity: 0.5, dashArray: '6,8' }).addTo(map);
+  L.circle([HOSP.lat, HOSP.lng], { radius: 50, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.25, weight: 2 }).addTo(map);
+  L.circle([ATS.lat, ATS.lng], { radius: 80, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.2, weight: 2 }).addTo(map);
+})();
+
+// Nuisance point markers
+if (typeof NUISANCE_POINTS !== 'undefined') {
+  NUISANCE_POINTS.forEach(function(np) {
+    var t = NUISANCE_TYPES[np.type];
+    if (!t) return;
+    L.marker([np.lat, np.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="font-size:12px;text-align:center;opacity:0.7;">' + t.icon + '</div>',
+        iconSize: [16, 16], iconAnchor: [8, 8]
+      })
+    }).addTo(map).bindPopup('<strong>' + np.name + '</strong><br><span style="font-size:11px;color:#666;">' + t.label + '</span>');
+  });
+}
+
+// DATA
+scoreAllListings();
+var listings = [];
+var listingMarkers = [];
+
+function getFilteredShowings() {
+  var all = getShowings();
+  return LISTINGS.filter(function(l) {
+    var sd = all[l.a];
+    return sd && sd.status !== 'cancelled' && !isListingDismissed(l.a);
+  }).sort(function(a, b) {
+    var all2 = getShowings();
+    var oa = (all2[a.a] && all2[a.a].showOrder) || 999;
+    var ob = (all2[b.a] && all2[b.a].showOrder) || 999;
+    if (oa !== ob) return oa - ob;
+    return b.score - a.score;
+  });
+}
+
+function renderListings() {
+  listings = getFilteredShowings();
+  var el = document.getElementById('panel-properties');
+  var badge = document.getElementById('cnt-props');
+  if (badge) badge.textContent = listings.length > 0 ? '(' + listings.length + ')' : '';
+
+  if (listings.length === 0) {
+    el.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#94a3b8;font-size:13px;">No showings requested yet.<br>Flag properties from the buyer dashboard.</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < listings.length; i++) {
+    var l = listings[i];
+    var sc = l.score >= 75 ? 'green' : l.score >= 40 ? 'yellow' : 'red';
+    var scBg = l.score >= 75 ? '#dcfce7' : l.score >= 40 ? '#fef3c7' : '#fee2e2';
+    var scColor = l.score >= 75 ? '#166534' : l.score >= 40 ? '#92400e' : '#991b1b';
+    var link = l.lk ? '<a class="prop-link" href="' + l.lk + '" target="_blank" onclick="event.stopPropagation()">View Listing →</a>' : '';
+    var specs = '$' + l.p.toLocaleString();
+    if (l.bd) specs += ' · ' + l.bd + 'bd/' + l.ba + 'ba';
+    if (l.sf) specs += ' · ' + l.sf + ' sqft';
+    html += '<div class="prop" onclick="flyTo(' + l.lat + ',' + l.lng + ')">' +
+      '<div class="prop-rank ' + sc + '">' + (i + 1) + '</div>' +
+      '<div class="prop-info">' +
+        '<div class="prop-addr">' + l.a + '</div>' +
+        '<div class="prop-meta">' + specs + '</div>' +
+      '</div>' +
+      '<div class="prop-score" style="background:' + scBg + ';color:' + scColor + ';">' + l.score + '</div>' +
+      link +
+    '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderMarkers() {
+  listingMarkers.forEach(function(m) { map.removeLayer(m); });
+  listingMarkers = [];
+
+  for (var i = 0; i < listings.length; i++) {
+    var l = listings[i];
+    var sz = 28;
+    var icon = L.divIcon({
+      className: '',
+      iconSize: [sz, sz], iconAnchor: [sz/2, sz/2],
+      html: '<div style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:#059669;border:2px solid #064e3b;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">' + (i + 1) + '</div>'
+    });
+    var marker = L.marker([l.lat, l.lng], { icon: icon }).addTo(map);
+    marker.bindPopup('<strong>' + l.a + '</strong><br>$' + l.p.toLocaleString() + ' · Score: ' + l.score);
+    listingMarkers.push(marker);
+  }
+}
+
+function flyTo(lat, lng) { map.flyTo([lat, lng], 17, { duration: 0.8 }); }
+
+// TAB SWITCHING
+function switchTab(tab) {
+  document.querySelectorAll('.tabs > .tab').forEach(function(t, i) {
+    var tabs = ['properties', 'prefs', 'history', 'contact'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.getElementById('panel-properties').classList.toggle('active', tab === 'properties');
+  document.getElementById('panel-properties').style.display = tab === 'properties' ? 'block' : 'none';
+  document.getElementById('panel-prefs').style.display = tab === 'prefs' ? 'block' : 'none';
+  document.getElementById('panel-history').style.display = tab === 'history' ? 'block' : 'none';
+  document.getElementById('panel-contact').style.display = tab === 'contact' ? 'block' : 'none';
+}
+
+// MOBILE
+var _mobShowMap = false;
+function toggleMobileView() {
+  _mobShowMap = !_mobShowMap;
+  document.getElementById('mob-sb').classList.toggle('mob-hidden', _mobShowMap);
+  document.getElementById('mob-map').classList.toggle('mob-hidden', !_mobShowMap);
+  document.getElementById('mob-toggle').textContent = _mobShowMap ? 'Show Listings' : 'Show Map';
+  if (_mobShowMap) setTimeout(function() { map.invalidateSize(); }, 100);
+}
+
+// INIT
+(async function() {
+  showLoadingOverlay();
+  if (!await checkAuth()) return;
+  await hydrateFromSupabase();
+  await fetchCachedRentEstimates();
+  applyAllStoredCorrections();
+  scoreAllListings();
+  updateRentMaxOffers();
+  hideLoadingOverlay();
+
+  fetchLastRefreshTime().then(displayRefreshTime);
+  renderListings();
+  renderMarkers();
+
+  // Real-time sync
+  subscribeToChanges(function onRemoteChange(table) {
+    applyAllStoredCorrections();
+    scoreAllListings();
+    updateRentMaxOffers();
+    renderListings();
+    renderMarkers();
+  });
+
+  subscribeToRefreshLog();
+})();
+</script>
+</body>
+</html>
