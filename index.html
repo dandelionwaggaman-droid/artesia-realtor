@@ -487,7 +487,7 @@ function toggleMobileView() {
 // INIT
 (async function() {
   showLoadingOverlay();
-  if (!await checkAuth()) return;
+  // Auth handled by password gate — skip Supabase auth
   await hydrateFromSupabase();
   await fetchCachedRentEstimates();
   applyAllStoredCorrections();
