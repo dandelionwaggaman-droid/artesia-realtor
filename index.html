@@ -8,7 +8,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="artesia-config.js?v=11"></script>
-<script src="artesia-sync.js?v=5"></script>
+<script src="artesia-sync.js?v=6"></script>
+<script>
+// Override auth functions — access controlled by password gate
+checkAuth = async function() { return true; };
+showLoginOverlay = function() {};
+</script>
 <script src="artesia-data.js?v=11"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
